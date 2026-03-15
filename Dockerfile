@@ -5,12 +5,12 @@ SHELL ["/bin/bash", "-lc"]
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
-ENV UV_SYSTEM_PYTHON=1
+ENV UV_PYTHON=/isaac-sim/python.sh
 
 WORKDIR /workspace
 COPY pyproject.toml README.md /workspace/
 COPY src /workspace/src
-RUN uv pip install --system -e .
+RUN uv pip install --python /isaac-sim/python.sh -e .
 
 ENV ACCEPT_EULA=Y
 ENV OMNI_KIT_ACCEPT_EULA=YES

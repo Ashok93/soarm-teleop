@@ -104,6 +104,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--ik_rot_step", type=float, default=0.05, help="IK rotation step size (rad).")
     parser.add_argument("--headless", action="store_true", help="Run headless.")
     parser.add_argument("--sim_device", default="cuda", help="Simulation device (e.g. cuda, cpu).")
+    parser.add_argument("--debug", action="store_true", help="Print debug info about joint targets.")
     return parser.parse_args()
 
 
@@ -227,12 +228,17 @@ def main() -> None:
             ik_device.add_callback(carb.input.KeyboardInput.R, _set_reset_flag)
 
         ik_controller = DifferentialIKController(
-            DifferentialIKControllerCfg(command_type="pose", use_relative_mode=False)
+            DifferentialIKControllerCfg(
+                command_type="pose",
+                use_relative_mode=False,
+                ik_method="damped_least_squares",
+            )
         )
         print("[INFO] IK mode: Se3Keyboard mapping active; R resets target.")
 
     dt = sim.get_physics_dt()
     last_time = time.time()
+    debug_last = 0.0
 
     while simulation_app.is_running():
         if args_cli.mode == "joint" and joint_device is not None:
@@ -247,6 +253,12 @@ def main() -> None:
             joint_target[:, joint_ids] = _clamp_to_limits(joint_target[:, joint_ids], joint_limits, joint_ids)
             joint_target[:, gripper_id] = gripper_closed if gripper_state.is_closed else gripper_open
             robot.set_joint_position_target(joint_target)
+            if args_cli.debug and (time.time() - debug_last) > 0.5:
+                print(
+                    f"[DEBUG] joints={joint_target[0, joint_ids].detach().cpu().numpy()} "
+                    f"gripper={joint_target[0, gripper_id].item():.3f}"
+                )
+                debug_last = time.time()
 
         if args_cli.mode == "ik" and ik_device is not None and ik_controller is not None:
             cmd = ik_device.advance()
@@ -283,6 +295,12 @@ def main() -> None:
                 gripper_state.is_closed = True
             joint_target[:, gripper_id] = gripper_closed if gripper_state.is_closed else gripper_open
             robot.set_joint_position_target(joint_target)
+            if args_cli.debug and (time.time() - debug_last) > 0.5:
+                print(
+                    f"[DEBUG] joints={joint_target[0, joint_ids].detach().cpu().numpy()} "
+                    f"gripper={joint_target[0, gripper_id].item():.3f}"
+                )
+                debug_last = time.time()
 
         sim.step()
         scene.update(dt)

@@ -10,7 +10,8 @@ ENV UV_PYTHON=/isaac-sim/python.sh
 WORKDIR /workspace
 COPY pyproject.toml README.md /workspace/
 COPY src /workspace/src
-RUN uv pip install --python /isaac-sim/python.sh -e .
+RUN uv pip install --python /isaac-sim/python.sh setuptools wheel
+RUN uv pip install --python /isaac-sim/python.sh --no-build-isolation -e .
 
 ENV ACCEPT_EULA=Y
 ENV OMNI_KIT_ACCEPT_EULA=YES

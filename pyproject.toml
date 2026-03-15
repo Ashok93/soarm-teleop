@@ -8,6 +8,7 @@ dependencies = [
     "isaaclab[all]==2.3.0",
     "torch==2.7.0",
     "torchvision==0.22.0",
+    "numpy==1.26.4",
 ]
 
 [project.scripts]
@@ -27,7 +28,7 @@ url = "https://pypi.nvidia.com/"
 url = "https://download.pytorch.org/whl/cu128"
 
 [tool.uv.extra-build-dependencies]
-flatdict = ["setuptools"]
+flatdict = ["setuptools", "wheel"]
 
 [build-system]
 requires = ["uv_build>=0.8.21,<0.9.0"]

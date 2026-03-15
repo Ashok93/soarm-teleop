@@ -18,10 +18,7 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
     ports:
       - "5900:5900"
-    device_requests:
-      - driver: nvidia
-        count: all
-        capabilities: [gpu]
+    runtime: nvidia
     shm_size: "4gb"
     stdin_open: true
     tty: true

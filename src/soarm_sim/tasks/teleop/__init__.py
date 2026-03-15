@@ -1,0 +1,1 @@
+"""Teleoperation scene configuration."""

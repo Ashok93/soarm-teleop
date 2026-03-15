@@ -1,0 +1,27 @@
+services:
+  soarm-sim:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        ISAACSIM_BASE_IMAGE: ${ISAACSIM_BASE_IMAGE:-nvcr.io/nvidia/isaac-sim:5.1.0}
+    environment:
+      ACCEPT_EULA: "Y"
+      OMNI_KIT_ACCEPT_EULA: "YES"
+      DISPLAY: ${DISPLAY:-:0}
+      NVIDIA_VISIBLE_DEVICES: "all"
+      NVIDIA_DRIVER_CAPABILITIES: "all"
+      ENABLE_VNC: ${ENABLE_VNC:-0}
+      VNC_PORT: ${VNC_PORT:-5900}
+    volumes:
+      - .:/workspace:rw
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    ports:
+      - "5900:5900"
+    device_requests:
+      - driver: nvidia
+        count: all
+        capabilities: [gpu]
+    shm_size: "4gb"
+    stdin_open: true
+    tty: true

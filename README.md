@@ -49,16 +49,6 @@ xhost +local:root
 
 The compose file mounts `/tmp/.X11-unix` and passes `DISPLAY`.
 
-### VNC (optional)
-
-Set `ENABLE_VNC=1` in `docker-compose.yml` or when launching:
-
-```bash
-ENABLE_VNC=1 docker compose up -d
-```
-
-Then connect to port `5900` on the host. The entrypoint will start `x11vnc` and `Xvfb` when `ENABLE_VNC=1`.
-
 ## Teleop Controls
 
 ### Joint mode

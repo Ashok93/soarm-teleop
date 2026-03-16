@@ -230,7 +230,7 @@ def main() -> None:
 
         ik_controller = DifferentialIKController(
             DifferentialIKControllerCfg(
-                command_type="position",
+                command_type="pose",
                 use_relative_mode=False,
                 ik_method="dls",
             ),
@@ -291,7 +291,8 @@ def main() -> None:
                     min=torch.tensor([0.10, -0.25, 0.05], device=target_pos.device),
                     max=torch.tensor([0.45, 0.25, 0.45], device=target_pos.device),
                 )
-            ik_controller.set_command(target_pos)
+            # Hold orientation constant to avoid pose flips.
+            ik_controller.set_command(torch.cat([target_pos, target_quat], dim=-1))
 
             jacobians = robot.root_physx_view.get_jacobians()
             ee_jacobian = jacobians[:, ee_body_id, :, joint_ids]

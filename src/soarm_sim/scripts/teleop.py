@@ -144,7 +144,9 @@ class ClickTarget:
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="SO-ARM101 teleoperation")
-    parser.add_argument("--mode", choices=["joint", "ik", "ik_click"], default="joint", help="Teleop mode.")
+    parser.add_argument(
+        "--mode", choices=["joint", "ik", "ik_click", "ik_target"], default="joint", help="Teleop mode."
+    )
     parser.add_argument("--device", choices=["keyboard"], default="keyboard", help="Teleop input device.")
     parser.add_argument("--num_envs", type=int, default=1, help="Number of parallel environments.")
     parser.add_argument("--real_time", action="store_true", help="Run in real-time, if possible.")
@@ -153,6 +155,14 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--ik_rot_step", type=float, default=0.01, help="IK rotation step size (rad).")
     parser.add_argument("--ik_blend", type=float, default=0.15, help="Blend to smooth IK targets (0-1).")
     parser.add_argument("--ik_click_plane_z", type=float, default=0.12, help="Click target plane height.")
+    parser.add_argument(
+        "--ik_target",
+        nargs=3,
+        type=float,
+        default=None,
+        metavar=("X", "Y", "Z"),
+        help="Target position for ik_target mode (meters, robot frame).",
+    )
     parser.add_argument("--headless", action="store_true", help="Run headless.")
     parser.add_argument("--sim_device", default="cuda", help="Simulation device (e.g. cuda, cpu).")
     parser.add_argument("--debug", action="store_true", help="Print debug info about joint targets.")
@@ -264,7 +274,7 @@ def main() -> None:
         nonlocal reset_target
         reset_target = True
 
-    if args_cli.mode in ("ik", "ik_click"):
+    if args_cli.mode in ("ik", "ik_click", "ik_target"):
         if args_cli.mode == "ik":
             ik_device = Se3Keyboard(
                 Se3KeyboardCfg(
@@ -279,7 +289,7 @@ def main() -> None:
                 import carb
 
                 ik_device.add_callback(carb.input.KeyboardInput.R, _set_reset_flag)
-        else:
+        elif args_cli.mode == "ik_click":
             click_target = ClickTarget(args_cli.ik_click_plane_z)
 
         ik_controller = DifferentialIKController(
@@ -293,8 +303,10 @@ def main() -> None:
         )
         if args_cli.mode == "ik":
             print("[INFO] IK mode: Se3Keyboard mapping active; R resets target.")
-        else:
+        elif args_cli.mode == "ik_click":
             print("[INFO] IK click mode: left-click in viewport to set target position.")
+        else:
+            print("[INFO] IK target mode: moving to fixed target position.")
 
     dt = sim.get_physics_dt()
     last_time = time.time()
@@ -321,7 +333,7 @@ def main() -> None:
                 )
                 debug_last = time.time()
 
-        if args_cli.mode in ("ik", "ik_click") and ik_controller is not None:
+        if args_cli.mode in ("ik", "ik_click", "ik_target") and ik_controller is not None:
             delta_pose = None
             gripper_cmd = None
             if args_cli.mode == "ik" and ik_device is not None:
@@ -331,6 +343,8 @@ def main() -> None:
                 target_hit = click_target.read()
                 if target_hit is not None:
                     delta_pose = "click"
+            elif args_cli.mode == "ik_target" and args_cli.ik_target is not None:
+                delta_pose = "target"
 
             if reset_target:
                 target_pos = None
@@ -351,6 +365,10 @@ def main() -> None:
 
             if delta_pose == "click":
                 target_pos = torch.tensor(target_hit, device=ee_pos_b.device).unsqueeze(0).repeat(num_envs, 1)
+            elif delta_pose == "target":
+                target_pos = (
+                    torch.tensor(args_cli.ik_target, device=ee_pos_b.device).unsqueeze(0).repeat(num_envs, 1)
+                )
             elif delta_pose is not None:
                 delta_pose_t = delta_pose.to(ee_pos_b.device).unsqueeze(0).repeat(num_envs, 1)
                 if torch.linalg.norm(delta_pose_t) > 1e-8:

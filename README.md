@@ -79,6 +79,14 @@ Click in the viewport to set a target position on the table plane.
 /isaac-sim/python.sh -m soarm_sim.scripts.teleop --mode ik_click
 ```
 
+### IK target mode (CLI pose)
+
+Move to a fixed target position (robot frame, meters).
+
+```bash
+/isaac-sim/python.sh -m soarm_sim.scripts.teleop --mode ik_target --ik_target 0.30 0.00 0.20
+```
+
 ## Notes
 
 - Isaac Lab runs inside Isaac Sim's Python environment. That is why the runtime image must be based on an Isaac Sim image.

@@ -366,9 +366,13 @@ def main() -> None:
             if delta_pose == "click":
                 target_pos = torch.tensor(target_hit, device=ee_pos_b.device).unsqueeze(0).repeat(num_envs, 1)
             elif delta_pose == "target":
-                target_pos = (
-                    torch.tensor(args_cli.ik_target, device=ee_pos_b.device).unsqueeze(0).repeat(num_envs, 1)
+                target_pos_w = torch.tensor(args_cli.ik_target, device=ee_pos_b.device).unsqueeze(0).repeat(
+                    num_envs, 1
                 )
+                identity_quat = torch.tensor([1.0, 0.0, 0.0, 0.0], device=ee_pos_b.device).unsqueeze(0).repeat(
+                    num_envs, 1
+                )
+                target_pos, _ = subtract_frame_transforms(root_pos_w, root_quat_w, target_pos_w, identity_quat)
             elif delta_pose is not None:
                 delta_pose_t = delta_pose.to(ee_pos_b.device).unsqueeze(0).repeat(num_envs, 1)
                 if torch.linalg.norm(delta_pose_t) > 1e-8:

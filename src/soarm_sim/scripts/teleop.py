@@ -103,11 +103,6 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--ik_pos_step", type=float, default=0.003, help="IK position step size.")
     parser.add_argument("--ik_rot_step", type=float, default=0.01, help="IK rotation step size (rad).")
     parser.add_argument("--ik_blend", type=float, default=0.15, help="Blend to smooth IK targets (0-1).")
-    parser.add_argument(
-        "--ik_allow_rotation",
-        action="store_true",
-        help="Allow orientation updates from keyboard (can be unstable).",
-    )
     parser.add_argument("--headless", action="store_true", help="Run headless.")
     parser.add_argument("--sim_device", default="cuda", help="Simulation device (e.g. cuda, cpu).")
     parser.add_argument("--debug", action="store_true", help="Print debug info about joint targets.")
@@ -290,18 +285,12 @@ def main() -> None:
 
             delta_pose_t = delta_pose.to(ee_pos_b.device).unsqueeze(0).repeat(num_envs, 1)
             if torch.linalg.norm(delta_pose_t) > 1e-8:
-                if not args_cli.ik_allow_rotation:
-                    delta_pose_t[:, 3:6] = 0.0
                 target_pos, target_quat = apply_delta_pose(target_pos, target_quat, delta_pose_t)
                 # Keep targets in a safe workspace to avoid self-collisions and ground hits.
                 target_pos = target_pos.clamp(
                     min=torch.tensor([0.10, -0.25, 0.05], device=target_pos.device),
                     max=torch.tensor([0.45, 0.25, 0.45], device=target_pos.device),
                 )
-            else:
-                # If no input, lock target to current pose to prevent drift.
-                target_pos = ee_pos_b.clone()
-                target_quat = ee_quat_b.clone()
             # Hold orientation constant to avoid pose flips.
             ik_controller.set_command(torch.cat([target_pos, target_quat], dim=-1))
 

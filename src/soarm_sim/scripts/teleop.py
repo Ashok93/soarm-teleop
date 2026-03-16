@@ -231,7 +231,7 @@ def main() -> None:
             DifferentialIKControllerCfg(
                 command_type="pose",
                 use_relative_mode=False,
-                ik_method="damped_least_squares",
+                ik_method="dls",
             )
         )
         print("[INFO] IK mode: Se3Keyboard mapping active; R resets target.")
@@ -253,6 +253,7 @@ def main() -> None:
             joint_target[:, joint_ids] = _clamp_to_limits(joint_target[:, joint_ids], joint_limits, joint_ids)
             joint_target[:, gripper_id] = gripper_closed if gripper_state.is_closed else gripper_open
             robot.set_joint_position_target(joint_target)
+            robot.write_data_to_sim()
             if args_cli.debug and (time.time() - debug_last) > 0.5:
                 print(
                     f"[DEBUG] joints={joint_target[0, joint_ids].detach().cpu().numpy()} "
@@ -295,6 +296,7 @@ def main() -> None:
                 gripper_state.is_closed = True
             joint_target[:, gripper_id] = gripper_closed if gripper_state.is_closed else gripper_open
             robot.set_joint_position_target(joint_target)
+            robot.write_data_to_sim()
             if args_cli.debug and (time.time() - debug_last) > 0.5:
                 print(
                     f"[DEBUG] joints={joint_target[0, joint_ids].detach().cpu().numpy()} "

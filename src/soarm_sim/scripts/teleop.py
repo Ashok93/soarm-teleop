@@ -282,14 +282,16 @@ def main() -> None:
             if target_pos is None or target_quat is None:
                 target_pos = ee_pos_b.clone()
                 target_quat = ee_quat_b.clone()
+                # Start slightly above the current pose to avoid table contact.
+                target_pos[:, 2] += 0.08
 
             delta_pose_t = delta_pose.to(ee_pos_b.device).unsqueeze(0).repeat(num_envs, 1)
             if torch.linalg.norm(delta_pose_t) > 1e-8:
                 target_pos, target_quat = apply_delta_pose(target_pos, target_quat, delta_pose_t)
                 # Keep targets in a safe workspace to avoid self-collisions and ground hits.
                 target_pos = target_pos.clamp(
-                    min=torch.tensor([0.10, -0.25, 0.05], device=target_pos.device),
-                    max=torch.tensor([0.45, 0.25, 0.45], device=target_pos.device),
+                    min=torch.tensor([0.10, -0.25, 0.12], device=target_pos.device),
+                    max=torch.tensor([0.45, 0.25, 0.50], device=target_pos.device),
                 )
             # Hold orientation constant to avoid pose flips.
             ik_controller.set_command(torch.cat([target_pos, target_quat], dim=-1))

@@ -232,7 +232,9 @@ def main() -> None:
                 command_type="pose",
                 use_relative_mode=False,
                 ik_method="dls",
-            )
+            ),
+            num_envs=num_envs,
+            device=sim.device,
         )
         print("[INFO] IK mode: Se3Keyboard mapping active; R resets target.")
 

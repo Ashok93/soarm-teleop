@@ -230,7 +230,7 @@ def main() -> None:
 
         ik_controller = DifferentialIKController(
             DifferentialIKControllerCfg(
-                command_type="pose",
+                command_type="position",
                 use_relative_mode=False,
                 ik_method="dls",
             ),
@@ -284,8 +284,14 @@ def main() -> None:
                 target_quat = ee_quat_b.clone()
 
             delta_pose_t = delta_pose.to(ee_pos_b.device).unsqueeze(0).repeat(num_envs, 1)
-            target_pos, target_quat = apply_delta_pose(target_pos, target_quat, delta_pose_t)
-            ik_controller.set_command(torch.cat([target_pos, target_quat], dim=-1))
+            if torch.linalg.norm(delta_pose_t) > 1e-8:
+                target_pos, target_quat = apply_delta_pose(target_pos, target_quat, delta_pose_t)
+                # Keep targets in a safe workspace to avoid self-collisions and ground hits.
+                target_pos = target_pos.clamp(
+                    min=torch.tensor([0.10, -0.25, 0.05], device=target_pos.device),
+                    max=torch.tensor([0.45, 0.25, 0.45], device=target_pos.device),
+                )
+            ik_controller.set_command(target_pos)
 
             jacobians = robot.root_physx_view.get_jacobians()
             ee_jacobian = jacobians[:, ee_body_id, :, joint_ids]

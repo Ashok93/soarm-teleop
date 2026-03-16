@@ -100,8 +100,9 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--num_envs", type=int, default=1, help="Number of parallel environments.")
     parser.add_argument("--real_time", action="store_true", help="Run in real-time, if possible.")
     parser.add_argument("--joint_rate", type=float, default=0.6, help="Joint velocity rate (rad/s).")
-    parser.add_argument("--ik_pos_step", type=float, default=0.01, help="IK position step size.")
-    parser.add_argument("--ik_rot_step", type=float, default=0.05, help="IK rotation step size (rad).")
+    parser.add_argument("--ik_pos_step", type=float, default=0.003, help="IK position step size.")
+    parser.add_argument("--ik_rot_step", type=float, default=0.02, help="IK rotation step size (rad).")
+    parser.add_argument("--ik_blend", type=float, default=0.15, help="Blend to smooth IK targets (0-1).")
     parser.add_argument("--headless", action="store_true", help="Run headless.")
     parser.add_argument("--sim_device", default="cuda", help="Simulation device (e.g. cuda, cpu).")
     parser.add_argument("--debug", action="store_true", help="Print debug info about joint targets.")
@@ -291,7 +292,9 @@ def main() -> None:
             joint_pos = robot.data.joint_pos[:, joint_ids]
 
             joint_pos_des = ik_controller.compute(ee_pos_b, ee_quat_b, ee_jacobian, joint_pos)
-            joint_target[:, joint_ids] = _clamp_to_limits(joint_pos_des, joint_limits, joint_ids)
+            # Smooth IK output to avoid violent jumps.
+            blended = (1.0 - args_cli.ik_blend) * joint_pos + args_cli.ik_blend * joint_pos_des
+            joint_target[:, joint_ids] = _clamp_to_limits(blended, joint_limits, joint_ids)
             if gripper_cmd.item() > 0:
                 gripper_state.is_closed = False
             elif gripper_cmd.item() < 0:

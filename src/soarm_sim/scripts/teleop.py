@@ -251,6 +251,21 @@ def main() -> None:
 
     reset_scene()
 
+    # Compute table top height in world frame for safe IK clamping.
+    table_top_z = None
+    try:
+        import omni.usd
+        from pxr import UsdGeom
+
+        stage = omni.usd.get_context().get_stage()
+        table_prim = stage.GetPrimAtPath("/World/envs/env_0/Table")
+        if table_prim.IsValid():
+            bbox_cache = UsdGeom.BBoxCache(UsdGeom.Tokens.default_, ["default", "render"])
+            bbox = bbox_cache.ComputeWorldBound(table_prim)
+            table_top_z = bbox.GetRange().GetMax()[2]
+    except Exception:
+        table_top_z = None
+
     joint_target = robot.data.default_joint_pos.clone()
     joint_limits = robot.data.joint_pos_limits[0]
     gripper_limits = joint_limits[gripper_id]
@@ -378,11 +393,17 @@ def main() -> None:
                 if torch.linalg.norm(delta_pose_t) > 1e-8:
                     target_pos, target_quat = apply_delta_pose(target_pos, target_quat, delta_pose_t)
             if target_pos is not None:
-                # Keep targets in a safe workspace to avoid self-collisions and ground hits.
-                target_pos = target_pos.clamp(
-                    min=torch.tensor([0.10, -0.25, 0.12], device=target_pos.device),
-                    max=torch.tensor([0.45, 0.25, 0.50], device=target_pos.device),
-                )
+                # Clamp workspace in base frame, but compute Z from table height in world frame.
+                base_z = root_pos_w[:, 2:3]
+                if table_top_z is not None:
+                    min_z_base = (table_top_z + 0.05) - base_z
+                else:
+                    min_z_base = torch.tensor([[0.12]], device=target_pos.device).repeat(num_envs, 1)
+                max_z_base = min_z_base + 0.50
+                target_pos[:, 0] = target_pos[:, 0].clamp(0.10, 0.50)
+                target_pos[:, 1] = target_pos[:, 1].clamp(-0.30, 0.30)
+                target_pos[:, 2] = torch.max(target_pos[:, 2:3], min_z_base).squeeze(1)
+                target_pos[:, 2] = torch.min(target_pos[:, 2:3], max_z_base).squeeze(1)
             # Hold orientation constant to avoid pose flips.
             ik_controller.set_command(torch.cat([target_pos, target_quat], dim=-1))
 

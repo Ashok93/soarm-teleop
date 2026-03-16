@@ -8,6 +8,8 @@ Minimal, self-contained teleoperation stack for SO-ARM101 using Isaac Sim 5.1.0 
 - `src/soarm_sim/robots/so_arm101/so_arm101_cfg.py` defines the robot articulation.
 - `src/soarm_sim/tasks/teleop/teleop_env_cfg.py` defines a minimal scene (table + robot + light).
 - `src/soarm_sim/scripts/teleop.py` provides keyboard teleop in joint space.
+- `src/soarm_sim/tasks/pick_place/pick_place_env_cfg.py` defines the pick-and-place scene with standard shapes and cameras.
+- `src/soarm_sim/scripts/collect_demos.py` collects scripted pick-and-place demos.
 
 ## Docker (Vast.ai / GPU)
 
@@ -35,8 +37,19 @@ docker compose exec soarm-sim bash
 4. Run teleop:
 
 ```bash
-uv run teleop --mode joint --device keyboard
 uv run teleop --device keyboard
+
+## Pick-and-Place Demos (Vision + Language)
+
+Collect scripted demonstrations with multi-view RGB-D observations.
+
+```bash
+uv run collect-demos --episodes 5 --output_dir datasets/pick_place
+```
+
+Notes:
+- Uses Isaac Sim standard primitive assets for cube/cylinder/sphere.
+- Scripted expert is deterministic and object-relative; replace with a more advanced policy as needed.
 ```
 
 ### X11 (recommended for you)

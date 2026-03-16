@@ -1,1 +1,1 @@
-"""Tasks for SO-ARM teleoperation."""
+"""Tasks for SO-ARM simulation."""

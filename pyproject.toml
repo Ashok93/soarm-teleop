@@ -13,6 +13,7 @@ dependencies = [
 
 [project.scripts]
 teleop = "soarm_sim.scripts.teleop:main"
+collect-demos = "soarm_sim.scripts.collect_demos:main"
 
 [tool.uv]
 index-strategy = "unsafe-best-match"

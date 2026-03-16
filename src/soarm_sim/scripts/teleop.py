@@ -93,9 +93,58 @@ class JointKeyboard:
             self._input.unsubscribe_from_keyboard_events(self._keyboard, self._sub)
 
 
+class ClickTarget:
+    """Click in viewport to set an IK target on a fixed Z plane."""
+
+    def __init__(self, plane_z: float) -> None:
+        import carb
+        import omni
+        import omni.kit.viewport.utility as viewport_utils
+
+        self._carb = carb
+        self._plane_z = plane_z
+        self._target = None
+        self._has_target = False
+
+        self._viewport_window = viewport_utils.get_active_viewport_window()
+        self._viewport_api = self._viewport_window.viewport_api if self._viewport_window else None
+        self._input = carb.input.acquire_input_interface()
+        self._app_window = omni.appwindow.get_default_app_window()
+        self._mouse = self._app_window.get_mouse()
+        self._sub = self._input.subscribe_to_mouse_events(self._mouse, self._on_mouse_event)
+
+    def _on_mouse_event(self, event: "carb.input.MouseEvent", *_args) -> bool:
+        if event.type != self._carb.input.MouseEventType.LEFT_BUTTON_RELEASE:
+            return True
+        if self._viewport_api is None:
+            return True
+        try:
+            origin, direction = self._viewport_api.get_camera_ray(event.x, event.y)
+        except Exception:
+            return True
+        if abs(direction[2]) < 1e-6:
+            return True
+        t = (self._plane_z - origin[2]) / direction[2]
+        if t <= 0:
+            return True
+        hit = origin + direction * t
+        self._target = hit
+        self._has_target = True
+        return True
+
+    def read(self):
+        if not self._has_target:
+            return None
+        return self._target
+
+    def destroy(self) -> None:
+        if self._input and self._sub:
+            self._input.unsubscribe_from_mouse_events(self._mouse, self._sub)
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="SO-ARM101 teleoperation")
-    parser.add_argument("--mode", choices=["joint", "ik"], default="joint", help="Teleop mode.")
+    parser.add_argument("--mode", choices=["joint", "ik", "ik_click"], default="joint", help="Teleop mode.")
     parser.add_argument("--device", choices=["keyboard"], default="keyboard", help="Teleop input device.")
     parser.add_argument("--num_envs", type=int, default=1, help="Number of parallel environments.")
     parser.add_argument("--real_time", action="store_true", help="Run in real-time, if possible.")
@@ -103,6 +152,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--ik_pos_step", type=float, default=0.003, help="IK position step size.")
     parser.add_argument("--ik_rot_step", type=float, default=0.01, help="IK rotation step size (rad).")
     parser.add_argument("--ik_blend", type=float, default=0.15, help="Blend to smooth IK targets (0-1).")
+    parser.add_argument("--ik_click_plane_z", type=float, default=0.12, help="Click target plane height.")
     parser.add_argument("--headless", action="store_true", help="Run headless.")
     parser.add_argument("--sim_device", default="cuda", help="Simulation device (e.g. cuda, cpu).")
     parser.add_argument("--debug", action="store_true", help="Print debug info about joint targets.")
@@ -204,6 +254,7 @@ def main() -> None:
         print("[INFO] Joint mode: W/S, E/D, R/F, T/G, Y/H for joints; O toggles gripper; P resets.")
 
     ik_device = None
+    click_target = None
     ik_controller = None
     target_pos = None
     target_quat = None
@@ -213,20 +264,23 @@ def main() -> None:
         nonlocal reset_target
         reset_target = True
 
-    if args_cli.mode == "ik":
-        ik_device = Se3Keyboard(
-            Se3KeyboardCfg(
-                pos_sensitivity=args_cli.ik_pos_step,
-                rot_sensitivity=args_cli.ik_rot_step,
-                sim_device=sim.device,
+    if args_cli.mode in ("ik", "ik_click"):
+        if args_cli.mode == "ik":
+            ik_device = Se3Keyboard(
+                Se3KeyboardCfg(
+                    pos_sensitivity=args_cli.ik_pos_step,
+                    rot_sensitivity=args_cli.ik_rot_step,
+                    sim_device=sim.device,
+                )
             )
-        )
-        try:
-            ik_device.add_callback("R", _set_reset_flag)
-        except Exception:
-            import carb
+            try:
+                ik_device.add_callback("R", _set_reset_flag)
+            except Exception:
+                import carb
 
-            ik_device.add_callback(carb.input.KeyboardInput.R, _set_reset_flag)
+                ik_device.add_callback(carb.input.KeyboardInput.R, _set_reset_flag)
+        else:
+            click_target = ClickTarget(args_cli.ik_click_plane_z)
 
         ik_controller = DifferentialIKController(
             DifferentialIKControllerCfg(
@@ -237,7 +291,10 @@ def main() -> None:
             num_envs=num_envs,
             device=sim.device,
         )
-        print("[INFO] IK mode: Se3Keyboard mapping active; R resets target.")
+        if args_cli.mode == "ik":
+            print("[INFO] IK mode: Se3Keyboard mapping active; R resets target.")
+        else:
+            print("[INFO] IK click mode: left-click in viewport to set target position.")
 
     dt = sim.get_physics_dt()
     last_time = time.time()
@@ -264,9 +321,16 @@ def main() -> None:
                 )
                 debug_last = time.time()
 
-        if args_cli.mode == "ik" and ik_device is not None and ik_controller is not None:
-            cmd = ik_device.advance()
-            delta_pose, gripper_cmd = _normalize_se3_command(cmd)
+        if args_cli.mode in ("ik", "ik_click") and ik_controller is not None:
+            delta_pose = None
+            gripper_cmd = None
+            if args_cli.mode == "ik" and ik_device is not None:
+                cmd = ik_device.advance()
+                delta_pose, gripper_cmd = _normalize_se3_command(cmd)
+            elif args_cli.mode == "ik_click" and click_target is not None:
+                target_hit = click_target.read()
+                if target_hit is not None:
+                    delta_pose = "click"
 
             if reset_target:
                 target_pos = None
@@ -285,9 +349,13 @@ def main() -> None:
                 # Start slightly above the current pose to avoid table contact.
                 target_pos[:, 2] += 0.08
 
-            delta_pose_t = delta_pose.to(ee_pos_b.device).unsqueeze(0).repeat(num_envs, 1)
-            if torch.linalg.norm(delta_pose_t) > 1e-8:
-                target_pos, target_quat = apply_delta_pose(target_pos, target_quat, delta_pose_t)
+            if delta_pose == "click":
+                target_pos = torch.tensor(target_hit, device=ee_pos_b.device).unsqueeze(0).repeat(num_envs, 1)
+            elif delta_pose is not None:
+                delta_pose_t = delta_pose.to(ee_pos_b.device).unsqueeze(0).repeat(num_envs, 1)
+                if torch.linalg.norm(delta_pose_t) > 1e-8:
+                    target_pos, target_quat = apply_delta_pose(target_pos, target_quat, delta_pose_t)
+            if target_pos is not None:
                 # Keep targets in a safe workspace to avoid self-collisions and ground hits.
                 target_pos = target_pos.clamp(
                     min=torch.tensor([0.10, -0.25, 0.12], device=target_pos.device),
@@ -304,10 +372,11 @@ def main() -> None:
             # Smooth IK output to avoid violent jumps.
             blended = (1.0 - args_cli.ik_blend) * joint_pos + args_cli.ik_blend * joint_pos_des
             joint_target[:, joint_ids] = _clamp_to_limits(blended, joint_limits, joint_ids)
-            if gripper_cmd.item() > 0:
-                gripper_state.is_closed = False
-            elif gripper_cmd.item() < 0:
-                gripper_state.is_closed = True
+            if gripper_cmd is not None:
+                if gripper_cmd.item() > 0:
+                    gripper_state.is_closed = False
+                elif gripper_cmd.item() < 0:
+                    gripper_state.is_closed = True
             joint_target[:, gripper_id] = gripper_closed if gripper_state.is_closed else gripper_open
             robot.set_joint_position_target(joint_target)
             robot.write_data_to_sim()
@@ -332,6 +401,8 @@ def main() -> None:
         joint_device.destroy()
     if ik_device is not None:
         ik_device.reset()
+    if click_target is not None:
+        click_target.destroy()
 
     simulation_app.close()
 

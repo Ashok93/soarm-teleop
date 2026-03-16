@@ -71,6 +71,14 @@ Uses Isaac Lab's `Se3Keyboard` mapping:
 - `O`: toggle gripper
 - `R`: reset target pose to current
 
+### IK click mode
+
+Click in the viewport to set a target position on the table plane.
+
+```bash
+/isaac-sim/python.sh -m soarm_sim.scripts.teleop --mode ik_click
+```
+
 ## Notes
 
 - Isaac Lab runs inside Isaac Sim's Python environment. That is why the runtime image must be based on an Isaac Sim image.

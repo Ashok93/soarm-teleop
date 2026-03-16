@@ -1,5 +1,6 @@
 services:
   soarm-sim:
+    image: neonpaddle/soarm-issac-teleop:latest
     build:
       context: .
       dockerfile: Dockerfile

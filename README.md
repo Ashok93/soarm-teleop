@@ -1,13 +1,13 @@
 # SO-ARM101 Teleop (Isaac Sim + Isaac Lab)
 
-Minimal, self-contained teleoperation stack for SO-ARM101 using Isaac Sim 5.1.0 and Isaac Lab 2.3.0. This repo vendors only the SO-ARM101 URDF + meshes and provides a simple teleop script with joint-space and IK modes.
+Minimal, self-contained teleoperation stack for SO-ARM101 using Isaac Sim 5.1.0 and Isaac Lab 2.3.0. This repo vendors only the SO-ARM101 URDF + meshes and provides a simple joint-space teleop script.
 
 ## Layout
 
 - `src/soarm_sim/robots/so_arm101/urdf` includes the SO-ARM101 URDF and meshes.
 - `src/soarm_sim/robots/so_arm101/so_arm101_cfg.py` defines the robot articulation.
 - `src/soarm_sim/tasks/teleop/teleop_env_cfg.py` defines a minimal scene (table + robot + light).
-- `src/soarm_sim/scripts/teleop.py` provides keyboard teleop in joint or IK mode.
+- `src/soarm_sim/scripts/teleop.py` provides keyboard teleop in joint space.
 
 ## Docker (Vast.ai / GPU)
 
@@ -36,7 +36,7 @@ docker compose exec soarm-sim bash
 
 ```bash
 uv run teleop --mode joint --device keyboard
-uv run teleop --mode ik --device keyboard
+uv run teleop --device keyboard
 ```
 
 ### X11 (recommended for you)
@@ -61,31 +61,6 @@ Keys set joint velocity commands; release stops movement.
 - `T/G`: wrist_flex +/-
 - `Y/H`: wrist_roll +/-
 - `O`: toggle gripper open/close
-
-### IK mode
-
-Uses Isaac Lab's `Se3Keyboard` mapping:
-
-- Translate: `W/S` (x), `A/D` (y), `Q/E` (z)
-- Rotate: `I/K` (roll), `J/L` (pitch), `U/O` (yaw)
-- `O`: toggle gripper
-- `R`: reset target pose to current
-
-### IK click mode
-
-Click in the viewport to set a target position on the table plane.
-
-```bash
-/isaac-sim/python.sh -m soarm_sim.scripts.teleop --mode ik_click
-```
-
-### IK target mode (CLI pose)
-
-Move to a fixed target position (robot frame, meters).
-
-```bash
-/isaac-sim/python.sh -m soarm_sim.scripts.teleop --mode ik_target --ik_target 0.30 0.00 0.20
-```
 
 ## Notes
 
